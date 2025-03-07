@@ -133,14 +133,48 @@ main_df = day_df[
 # Streamlit Main Page
 # ----------------------------
 # Title
-st.title("🚲 Bike Sharing Dashboard 🚲")
+st.title("Bike Sharing Dashboard")
 tab1, tab2, tab3 = st.tabs(["Overview", "Trends", "Analysis"])
 
 with tab1:
+    # Header dan Deskripsi
     st.markdown("""
-        ### **Overview**
-        Get a quick summary of bike sharing data.
+        ### **Overview** 🚴‍♂️
+        Welcome to the **Bike Sharing Dashboard**! This dashboard provides a quick yet comprehensive overview of bike sharing data, helping you understand key trends and patterns. Whether you're a city planner, a bike sharing operator, or a data enthusiast, this tool is designed to give you actionable insights to optimize bike sharing systems.
     """)
+
+    # Metrics
+      # Metrics
+    st.markdown("### **Key Metrics** 📊")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total Rides", value=f"{main_df['count'].sum():,}")
+    with col2:
+        st.metric("Total Casual Rides", value=f"{main_df['casual'].sum():,}")
+    with col3:
+        st.metric("Total Registered Rides", value=f"{main_df['registered'].sum():,}")
+    st.markdown("---")
+
+    # Seasonal Usage
+    st.markdown("### **Seasonal Usage** 🌸☀️🍂❄️")
+    st.markdown("""
+        Explore how bike rentals vary across different seasons. The chart below shows the total number of rides by **casual** and **registered** users for each season.
+    """)
+    seasonal_usage = day_df.groupby('season')[['registered', 'casual']].sum().reset_index()
+    fig = px.bar(seasonal_usage, x='season', y=['registered', 'casual'],
+                 title='Bike Rental Counts by Season',
+                 barmode='group',
+                 labels={'value': 'Total Rides', 'variable': 'User Type'},
+                 color_discrete_sequence=["#1f77b4", "#ff7f0e"])  # Warna yang lebih menarik
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Penjelasan Grafik dengan Expander
+    with st.expander("📝 **Insights: What does this chart tell us?**"):
+        st.markdown("""
+            - The highest number of bike rentals occurs in **Fall**, followed by **Summer** and **Winter**, while **Spring** has the lowest number of rentals.
+            - This indicates that **Fall** and **Summer** are more conducive for biking activities, likely due to pleasant weather conditions.
+            - **Spring**, which tends to be wetter or colder, may reduce the interest in bike rentals.
+        """)
 
 with tab2:
     st.markdown("""
@@ -148,61 +182,67 @@ with tab2:
         Explore usage trends over time.
     """)
 
+    # Monthly Rentals
+    st.markdown("### **Monthly Rentals**")
+    monthly_df['total_rides'] = monthly_df['casual_rides'] + monthly_df['registered_rides']
+    fig = px.bar(monthly_df,
+                 x='yearmonth',
+                 y=['casual_rides', 'registered_rides', 'total_rides'],
+                 barmode='group',
+                 title="Bike Rental Trends in Recent Years",
+                 labels={'casual_rides': 'Casual Rentals', 'registered_rides': 'Registered Rentals', 'total_rides': 'Total Rides'})
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Insights with Expander
+    with st.expander("📝 **Insights: What does this chart tell us?**"):
+        st.markdown("""
+            - **Consistent Growth**: Bike rentals in 2012 are consistently higher than in 2011 across all months.
+            - **Significant Increase**: A notable increase is observed from March to September, with the peak occurring in September.
+            - **Trend Analysis**: This indicates a growing trend in bike usage year over year, likely influenced by factors such as favorable weather conditions or increased public interest in cycling.
+        """)
+
+    # Scatter Plot: Season vs Temperature
+    st.markdown("### **Season vs Temperature**")
+    fig = px.scatter(day_df, x='temp', y='count', color='season',
+                     title='Bike Rental Clusters by Season and Temperature',
+                     labels={'temp': 'Temperature (°C)', 'count': 'Total Rides'})
+    st.plotly_chart(fig, use_container_width=True)
+
 with tab3:
     st.markdown("""
         ### **Analysis**
         Dive deep into user behavior and seasonal patterns.
     """)
-st.markdown("---")
 
-# Metrics
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.metric("Total Rides", value=main_df['count'].sum())
-with col2:
-    st.metric("Total Casual Rides", value=main_df['casual'].sum())
-with col3:
-    st.metric("Total Registered Rides", value=main_df['registered'].sum())
-st.markdown("---")
+    # Weather Distribution
+    st.markdown("### **Weather Distribution**")
+    fig = px.box(day_df, x='weathersit', y='count', color='weathersit',
+                 title='Bike Users Distribution Based on Weather Condition',
+                 labels={'weathersit': 'Weather Condition', 'count': 'Total Rides'})
+    st.plotly_chart(fig, use_container_width=True)
 
-# Visualizations
-# Monthly Rentals
-monthly_df['total_rides'] = monthly_df['casual_rides'] + monthly_df['registered_rides']
-fig = px.bar(monthly_df,
-             x='yearmonth',
-             y=['casual_rides', 'registered_rides', 'total_rides'],
-             barmode='group',
-             title="Bike Rental Trends in Recent Years",
-             labels={'casual_rides': 'Casual Rentals', 'registered_rides': 'Registered Rentals', 'total_rides': 'Total Rides'})
-st.plotly_chart(fig, use_container_width=True)
+    # Working Day, Holiday, and Weekday Analysis
+    st.markdown("### **Working Day, Holiday, and Weekday Analysis**")
 
-# Weather Distribution
-fig = px.box(day_df, x='weathersit', y='count', color='weathersit',
-             title='Bike Users Distribution Based on Weather Condition')
-st.plotly_chart(fig, use_container_width=True)
+    # Working Day vs Holiday
+    st.markdown("#### **Working Day vs Holiday**")
+    workingday_usage = day_df.groupby('workingday')['count'].sum().reset_index()
+    workingday_usage['workingday'] = workingday_usage['workingday'].map({0: 'Holiday/Weekend', 1: 'Working Day'})
+    fig1 = px.bar(workingday_usage, x='workingday', y='count',
+                  title='Total Bike Rentals: Working Day vs Holiday/Weekend',
+                  labels={'workingday': 'Day Type', 'count': 'Total Rides'},
+                  color='workingday',
+                  color_discrete_sequence=px.colors.qualitative.Pastel)
+    st.plotly_chart(fig1, use_container_width=True)
 
-# Working Day, Holiday, and Weekday Analysis
-fig1 = px.box(day_df, x='workingday', y='count', color='workingday',
-              title='Bike Rental Clusters by Working Day')
-fig2 = px.box(day_df, x='holiday', y='count', color='holiday',
-              title='Bike Rental Clusters by Holiday')
-fig3 = px.box(day_df, x='weekday', y='count', color='weekday',
-              title='Bike Rental Clusters by Weekday')
-st.plotly_chart(fig1, use_container_width=True)
-st.plotly_chart(fig2, use_container_width=True)
-st.plotly_chart(fig3, use_container_width=True)
-
-# Scatter Plot: Season vs Temperature
-fig = px.scatter(day_df, x='temp', y='count', color='season',
-                 title='Bike Rental Clusters by Season and Temperature')
-st.plotly_chart(fig, use_container_width=True)
-
-# Seasonal Usage
-seasonal_usage = day_df.groupby('season')[['registered', 'casual']].sum().reset_index()
-fig = px.bar(seasonal_usage, x='season', y=['registered', 'casual'],
-             title='Bike Rental Counts by Season',
-             barmode='group')
-st.plotly_chart(fig, use_container_width=True)
-
+    # Weekday Analysis
+    st.markdown("#### **Weekday Analysis**")
+    weekday_usage = day_df.groupby('weekday')['count'].sum().reset_index()
+    fig2 = px.bar(weekday_usage, x='weekday', y='count',
+                  title='Total Bike Rentals by Weekday',
+                  labels={'weekday': 'Weekday', 'count': 'Total Rides'},
+                  color='weekday',
+                  color_discrete_sequence=px.colors.qualitative.Pastel)
+    st.plotly_chart(fig2, use_container_width=True)
 # Footer
-st.caption('Copyright (c), created by Silvia Dharma')
+st.caption('Copyright (c), created by echaan')
