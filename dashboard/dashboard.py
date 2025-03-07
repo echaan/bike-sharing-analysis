@@ -1,4 +1,6 @@
-# Libraries Used
+# ----------------------------
+# Import Libraries
+# ----------------------------
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -7,16 +9,17 @@ import plotly.express as px
 from datetime import datetime
 import streamlit as st
 
-
+# ----------------------------
+# Load and Preprocess Data
+# ----------------------------
+# Load dataset
 day_df = pd.read_csv("day.csv")
 
-# Removing the windspeed column (not relevant to the business question)
+# Remove irrelevant columns
 drop_columns = ['instant', 'windspeed']
-
 day_df.drop(columns=drop_columns, inplace=True)
 
-
-# Changing column names (Optional)
+# Rename columns for clarity
 day_df.rename(columns={
     'dteday': 'dateday',
     'yr': 'year',
@@ -24,20 +27,18 @@ day_df.rename(columns={
     'cnt': 'count'
 }, inplace=True)
 
-# Changing the data type of the dateday column to datetime.
+# Convert 'dateday' to datetime
 day_df['dateday'] = pd.to_datetime(day_df['dateday'])
 
-# Changing data types
-# Weekday, month, year columns
+# Add additional date-related columns
 day_df['weekday'] = day_df['dateday'].dt.day_name()
 day_df['year'] = day_df['dateday'].dt.year
 
-# Season column
+# Map numerical values to categorical labels
 day_df['season'] = day_df['season'].map({
     1: 'Spring', 2: 'Summer', 3: 'Fall', 4: 'Winter'
 })
 
-# Weathersit column
 day_df['weathersit'] = day_df['weathersit'].map({
     1: 'Clear/Partly Cloudy',
     2: 'Misty/Cloudy',
@@ -45,217 +46,163 @@ day_df['weathersit'] = day_df['weathersit'].map({
     4: 'Severe Weather'
 })
 
-
-# Resampling data based on month and calculating total rides
-monthly_rent_df = day_df.resample(rule='M', on='dateday').agg({
+# Resample data by month
+monthly_df = day_df.resample(rule='M', on='dateday').agg({
     "casual": "sum",
     "registered": "sum",
     "count": "sum"
 })
-
-# Change index format to month-year (Jan-20, Feb-20, etc.)
-monthly_rent_df.index = monthly_rent_df.index.strftime('%b-%y')
-monthly_rent_df = monthly_rent_df.reset_index()
-
-# Rename columns
-monthly_rent_df.rename(columns={
+monthly_df.index = monthly_df.index.strftime('%b-%y')
+monthly_df = monthly_df.reset_index()
+monthly_df.rename(columns={
     "dateday": "yearmonth",
     "count": "total_rides",
     "casual": "casual_rides",
     "registered": "registered_rides"
 }, inplace=True)
 
-# Grouping bike renters (casual and registered) data by month
-grouped_by_month = day_df.groupby('month')
-aggregated_stats_by_month = grouped_by_month['count'].agg(['max', 'min', 'mean', 'sum'])
+# Fungsi untuk melakukan groupby dan agregasi
+def calculate_stats(df, group_col, agg_col, agg_funcs):
+    return df.groupby(group_col)[agg_col].agg(agg_funcs)
 
+# Agregasi untuk berbagai kelompok data
+month_stats = calculate_stats(day_df, 'month', 'count', ['max', 'min', 'mean', 'sum'])
+weather_stats = calculate_stats(day_df, 'weathersit', 'count', ['max', 'min', 'mean', 'sum'])
+holiday_stats = calculate_stats(day_df, 'holiday', 'count', ['max', 'min', 'mean', 'sum'])
+weekday_stats = calculate_stats(day_df, 'weekday', 'count', ['max', 'min', 'mean'])
+workingday_stats = calculate_stats(day_df, 'workingday', 'count', ['max', 'min', 'mean'])
 
-# Grouping bike renters (casual and registered) data by weather
-grouped_by_weather = day_df.groupby('weathersit')
-aggregated_stats_by_weather = grouped_by_weather['count'].agg(['max', 'min', 'mean', 'sum'])
-
-# Grouping bike renters (casual and registered) data by holiday
-grouped_by_holiday = day_df.groupby('holiday')
-aggregated_stats_by_holiday = grouped_by_holiday['count'].agg(['max', 'min', 'mean', 'sum'])
-
-# Comparing the number of bike renters on weekdays and weekends
-grouped_by_weekday = day_df.groupby('weekday')
-aggregated_stats_by_weekday = grouped_by_weekday['count'].agg(['max', 'min', 'mean'])
-
-# Grouping bike renters data by working day
-grouped_by_workingday = day_df.groupby('workingday')
-aggregated_stats_by_workingday = grouped_by_workingday['count'].agg(['max', 'min', 'mean'])
-
-# Grouping bike rental data by season
-grouped_by_season = day_df.groupby('season')
-aggregated_stats_by_season = grouped_by_season.agg({
+# Agregasi untuk season dengan kolom yang berbeda
+season_stats = day_df.groupby('season').agg({
     'casual': 'mean',
     'registered': 'mean',
     'count': ['max', 'min', 'mean']
 })
 
-# Grouping data by season and calculating aggregate statistics for temperature variables (temp),
-# perceived temperature (atemp),
-# and humidity (hum)
-aggregated_stats_by_season = day_df.groupby('season').agg({
+# Agregasi untuk variabel cuaca berdasarkan season
+season_weather_stats = day_df.groupby('season').agg({
     'temp': ['max', 'min', 'mean'],
     'atemp': ['max', 'min', 'mean'],
     'hum': ['max', 'min', 'mean']
 })
 
+# ----------------------------
+# Streamlit Sidebar
+# ----------------------------
+with st.sidebar:
+    # Sidebar logo
+    st.image("https://cdn-icons-png.flaticon.com/512/2972/2972185.png")  # Ikon sepeda
 
-# Menyiapkan filter components (komponen filter)
-min_date = day_df["dateday"].min()
-max_date = day_df["dateday"].max()
+    # Date filter
+    st.header("Pilih Rentang Tanggal")
+    min_date = day_df["dateday"].min()
+    max_date = day_df["dateday"].max()
+    start_date, end_date = st.date_input(
+        label="Pilih Tanggal Mulai dan Tanggal Akhir",
+        min_value=min_date,
+        max_value=max_date,
+        value=[min_date, max_date],
+        help="Pilih rentang tanggal untuk menampilkan data yang sesuai."
+    )
 
-# Menampilkan logo Capital Bikeshare di sidebar
-st.sidebar.image("https://jugnoo.io/wp-content/uploads/2022/05/on-demand-bike-sharing-1-1024x506.jpg")
+    st.header("About This Dashboard")
 
-# Menampilkan header "Filter" di sidebar
-st.sidebar.header("Filter:")
-# Memilih rentang tanggal dengan date_input di sidebar
-start_date, end_date = st.sidebar.date_input(
-    label="Date",
-    min_value=min_date,
-    max_value=max_date,
-    value=[min_date, max_date]
-)
+    # Informasi Tambahan
+    st.markdown("""
+        This dashboard provides insights into bike sharing trends and usage patterns.
+        - **Data Source**: [Bike Sharing Dataset](https://drive.google.com/file/d/1RaBmV6Q6FYWU4HWZs80Suqd7KQC34diQ/view?usp=sharing)
+        - **Last Updated**: March 2025
+        - **Contact**: [akkitherythm@gmail.com](mailto:akkitherythm@gmail.com)
+    """)
 
-# Menampilkan header "Connect with me" di sidebar
-st.sidebar.header("Connect with me:")
+    st.markdown("---")
+    st.markdown("**Connect with Me**")
+    st.markdown("[![LinkedIn](https://img.shields.io/badge/LinkedIn-Eric_Chaniago-blue?style=flat&logo=linkedin)](https://id.linkedin.com/in/m-eric-chaniago-994684232?trk=public_profile_browsemap)")
 
-# Menampilkan nama di sidebar
-st.sidebar.markdown("Silvia Dharma")
+    # Dataset link
+    st.markdown("**Github Project:** [Repository](https://github.com/echaan/bike-sharing-analysis)")
+# ---------------------------------------------------------------------------------
 
-
-# Menambahkan tautan LinkedIn di sidebar
-col1 = st.sidebar
-with col1:
-    st.markdown("[![LinkedIn]](https://id.linkedin.com/in/silvia-dharma-1a7265219?trk=public_profile_browsemap)")
-
-# Menambahkan teks penjelasan di sidebar
-st.sidebar.markdown("For inquiries and collaborations, feel free to contact me!")
-
-# Menampilkan teks motivasi di sidebar
-st.sidebar.markdown("Keep riding and stay healthy!")
-
-# Menambahkan pemisah horizontal di sidebar
-st.sidebar.markdown("---")
-
-# Menampilkan tautan dataset
-st.sidebar.markdown("[Dataset](https://drive.google.com/file/d/1RaBmV6Q6FYWU4HWZs80Suqd7KQC34diQ/view)")
-
-# Hubungkan filter dengan main_df
+# Filter main dataframe based on selected date range
 main_df = day_df[
     (day_df["dateday"] >= str(start_date)) &
     (day_df["dateday"] <= str(end_date))
 ]
 
-# Menampilkan judul "Bike Sharing Dashboard" di halaman utama
+# ----------------------------
+# Streamlit Main Page
+# ----------------------------
+# Title
 st.title("🚲 Bike Sharing Dashboard 🚲")
-st.markdown("##")
+tab1, tab2, tab3 = st.tabs(["Overview", "Trends", "Analysis"])
 
-# Membagi layar menjadi 3 kolom
-col1, col2, col3 = st.columns(3)
+with tab1:
+    st.markdown("""
+        ### **Overview**
+        Get a quick summary of bike sharing data.
+    """)
 
-# Menampilkan total rides di kolom pertama
-with col1:
-    total_all_rides = main_df['count'].sum()
-    st.metric("Total Rides", value=total_all_rides)
+with tab2:
+    st.markdown("""
+        ### **Trends**
+        Explore usage trends over time.
+    """)
 
-# Menampilkan total casual rides di kolom kedua
-with col2:
-    total_casual_rides = main_df['casual'].sum()
-    st.metric("Total Casual Rides", value=total_casual_rides)
-
-# Menampilkan total registered rides di kolom ketiga
-with col3:
-    total_registered_rides = main_df['registered'].sum()
-    st.metric("Total Registered Rides", value=total_registered_rides)
-
-# Menampilkan pemisah horizontal
+with tab3:
+    st.markdown("""
+        ### **Analysis**
+        Dive deep into user behavior and seasonal patterns.
+    """)
 st.markdown("---")
 
+# Metrics
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.metric("Total Rides", value=main_df['count'].sum())
+with col2:
+    st.metric("Total Casual Rides", value=main_df['casual'].sum())
+with col3:
+    st.metric("Total Registered Rides", value=main_df['registered'].sum())
+st.markdown("---")
 
-#Visualisai
-
-# Grouping data by yearmonth and calculating the total casual, registered, and total rides
-monthly_rent_df['total_rides'] = monthly_rent_df['casual_rides'] + monthly_rent_df['registered_rides']
-fig = px.bar(monthly_rent_df,
+# Visualizations
+# Monthly Rentals
+monthly_df['total_rides'] = monthly_df['casual_rides'] + monthly_df['registered_rides']
+fig = px.bar(monthly_df,
              x='yearmonth',
              y=['casual_rides', 'registered_rides', 'total_rides'],
              barmode='group',
-             color_discrete_sequence=["#FF69B4", "#00FF00", "#0000FF"],
              title="Bike Rental Trends in Recent Years",
              labels={'casual_rides': 'Casual Rentals', 'registered_rides': 'Registered Rentals', 'total_rides': 'Total Rides'})
-
-# Displaying the figure
-fig.update_layout(xaxis_title='', yaxis_title='Total Rentals',
-                  xaxis=dict(showgrid=False, showline=True, linecolor='rgb(204, 204, 204)', linewidth=2, mirror=True),
-                  yaxis=dict(showgrid=False, zeroline=False, showline=True, linecolor='rgb(204, 204, 204)', linewidth=2, mirror=True),
-                  plot_bgcolor='rgba(255, 255, 255, 0)',
-                  showlegend=True,
-                  legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-
- #Display the plot
 st.plotly_chart(fig, use_container_width=True)
 
-#Weather
-fig = px.box(day_df, x='weathersit', y='count', color='weathersit', 
-             title='Bike Users Distribution Based on Weather Condition',
-             labels={'weathersit': 'Weather Condition', 'count': 'Total Rentals'})
-
+# Weather Distribution
+fig = px.box(day_df, x='weathersit', y='count', color='weathersit',
+             title='Bike Users Distribution Based on Weather Condition')
 st.plotly_chart(fig, use_container_width=True)
 
-# Plot for working day
+# Working Day, Holiday, and Weekday Analysis
 fig1 = px.box(day_df, x='workingday', y='count', color='workingday',
-              title='Bike Rental Clusters by Working Day',
-              labels={'workingday': 'Working Day', 'count': 'Total Rentals'},
-              color_discrete_sequence=['#00FFFF', '#FF00FF', '#FFFF00', '#00FF00', '#FF0000'])
-fig1.update_xaxes(title_text='Working Day')
-fig1.update_yaxes(title_text='Total Rentals')
-
-# Plot for holiday
+              title='Bike Rental Clusters by Working Day')
 fig2 = px.box(day_df, x='holiday', y='count', color='holiday',
-              title='Bike Rental Clusters by Holiday',
-              labels={'holiday': 'Holiday', 'count': 'Total Rentals'},
-              color_discrete_sequence=['#00FFFF', '#FF00FF', '#FFFF00', '#00FF00', '#FF0000'])
-fig2.update_xaxes(title_text='Holiday')
-fig2.update_yaxes(title_text='Total Rentals')
-
-# Plot for weekday
+              title='Bike Rental Clusters by Holiday')
 fig3 = px.box(day_df, x='weekday', y='count', color='weekday',
-              title='Bike Rental Clusters by Weekday',
-              labels={'weekday': 'Weekday', 'count': 'Total Rentals'},
-              color_discrete_sequence=['#00FFFF', '#FF00FF', '#FFFF00', '#00FF00', '#FF0000'])
-fig3.update_xaxes(title_text='Weekday')
-fig3.update_yaxes(title_text='Total Rentals')
-
-# Displaying the plots
+              title='Bike Rental Clusters by Weekday')
 st.plotly_chart(fig1, use_container_width=True)
 st.plotly_chart(fig2, use_container_width=True)
 st.plotly_chart(fig3, use_container_width=True)
 
-# Creating a scatter plot
+# Scatter Plot: Season vs Temperature
 fig = px.scatter(day_df, x='temp', y='count', color='season',
-                 title='Bike Rental Clusters by Season and Temperature',
-                 labels={'temp': 'Temperature (°C)', 'count': 'Total Rentals'},
-                 color_discrete_sequence=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'],
-                 hover_name='season')
-
-# Displaying the plot
+                 title='Bike Rental Clusters by Season and Temperature')
 st.plotly_chart(fig, use_container_width=True)
 
-
-# Grouping data by season and calculating the total registered and casual usages
+# Seasonal Usage
 seasonal_usage = day_df.groupby('season')[['registered', 'casual']].sum().reset_index()
-
-# Creating a bar plot
 fig = px.bar(seasonal_usage, x='season', y=['registered', 'casual'],
              title='Bike Rental Counts by Season',
-             labels={'season': 'Season', 'value': 'Total Rentals', 'variable': 'User Type'},
-             color_discrete_sequence=["#00FF00","#0000FF"], barmode='group')
-
-# Displaying the plot
+             barmode='group')
 st.plotly_chart(fig, use_container_width=True)
+
+# Footer
 st.caption('Copyright (c), created by Silvia Dharma')
