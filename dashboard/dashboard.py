@@ -13,7 +13,7 @@ import streamlit as st
 # Load and Preprocess Data
 # ----------------------------
 # Load dataset
-day_df = pd.read_csv("day.csv")
+day_df = pd.read_csv("https://raw.githubusercontent.com/echaan/bike-sharing-analysis/refs/heads/main/data/day.csv")
 
 # Remove irrelevant columns
 drop_columns = ['instant', 'windspeed']
