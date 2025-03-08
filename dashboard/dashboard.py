@@ -5,8 +5,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import plotly.express as px
-from datetime import datetime
 import streamlit as st
 
 # ----------------------------
@@ -61,25 +59,25 @@ monthly_df.rename(columns={
     "registered": "registered_rides"
 }, inplace=True)
 
-# Fungsi untuk melakukan groupby dan agregasi
+# Function to perform groupby and aggregation
 def calculate_stats(df, group_col, agg_col, agg_funcs):
     return df.groupby(group_col)[agg_col].agg(agg_funcs)
 
-# Agregasi untuk berbagai kelompok data
+# Aggregation for various data groups
 month_stats = calculate_stats(day_df, 'month', 'count', ['max', 'min', 'mean', 'sum'])
 weather_stats = calculate_stats(day_df, 'weathersit', 'count', ['max', 'min', 'mean', 'sum'])
 holiday_stats = calculate_stats(day_df, 'holiday', 'count', ['max', 'min', 'mean', 'sum'])
 weekday_stats = calculate_stats(day_df, 'weekday', 'count', ['max', 'min', 'mean'])
 workingday_stats = calculate_stats(day_df, 'workingday', 'count', ['max', 'min', 'mean'])
 
-# Agregasi untuk season dengan kolom yang berbeda
+# Aggregation for season with different columns
 season_stats = day_df.groupby('season').agg({
     'casual': 'mean',
     'registered': 'mean',
     'count': ['max', 'min', 'mean']
 })
 
-# Agregasi untuk variabel cuaca berdasarkan season
+# Aggregation for weather variables by season
 season_weather_stats = day_df.groupby('season').agg({
     'temp': ['max', 'min', 'mean'],
     'atemp': ['max', 'min', 'mean'],
@@ -91,23 +89,23 @@ season_weather_stats = day_df.groupby('season').agg({
 # ----------------------------
 with st.sidebar:
     # Sidebar logo
-    st.image("https://cdn-icons-png.flaticon.com/512/2972/2972185.png")  # Ikon sepeda
+    st.image("https://cdn-icons-png.flaticon.com/512/2972/2972185.png")  # Bike icon
 
     # Date filter
-    st.header("Pilih Rentang Tanggal")
+    st.header("Select Date Range")
     min_date = day_df["dateday"].min()
     max_date = day_df["dateday"].max()
     start_date, end_date = st.date_input(
-        label="Pilih Tanggal Mulai dan Tanggal Akhir",
+        label="Select Start and End Date",
         min_value=min_date,
         max_value=max_date,
         value=[min_date, max_date],
-        help="Pilih rentang tanggal untuk menampilkan data yang sesuai."
+        help="Select a date range to display relevant data."
     )
 
     st.header("About This Dashboard")
 
-    # Informasi Tambahan
+    # Additional Information
     st.markdown("""
         This dashboard provides insights into bike sharing trends and usage patterns.
         - **Data Source**: [Bike Sharing Dataset](https://drive.google.com/file/d/1RaBmV6Q6FYWU4HWZs80Suqd7KQC34diQ/view?usp=sharing)
@@ -121,6 +119,7 @@ with st.sidebar:
 
     # Dataset link
     st.markdown("**Github Project:** [Repository](https://github.com/echaan/bike-sharing-analysis)")
+
 # ---------------------------------------------------------------------------------
 
 # Filter main dataframe based on selected date range
@@ -137,14 +136,13 @@ st.title("Bike Sharing Dashboard")
 tab1, tab2, tab3 = st.tabs(["Overview", "Trends", "Analysis"])
 
 with tab1:
-    # Header dan Deskripsi
+    # Header and Description
     st.markdown("""
         ### **Overview** 🚴‍♂️
         Welcome to the **Bike Sharing Dashboard**! This dashboard provides a quick yet comprehensive overview of bike sharing data, helping you understand key trends and patterns. Whether you're a city planner, a bike sharing operator, or a data enthusiast, this tool is designed to give you actionable insights to optimize bike sharing systems.
     """)
 
     # Metrics
-      # Metrics
     st.markdown("### **Key Metrics** 📊")
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -155,27 +153,6 @@ with tab1:
         st.metric("Total Registered Rides", value=f"{main_df['registered'].sum():,}")
     st.markdown("---")
 
-    # Seasonal Usage
-    st.markdown("### **Seasonal Usage** 🌸☀️🍂❄️")
-    st.markdown("""
-        Explore how bike rentals vary across different seasons. The chart below shows the total number of rides by **casual** and **registered** users for each season.
-    """)
-    seasonal_usage = day_df.groupby('season')[['registered', 'casual']].sum().reset_index()
-    fig = px.bar(seasonal_usage, x='season', y=['registered', 'casual'],
-                 title='Bike Rental Counts by Season',
-                 barmode='group',
-                 labels={'value': 'Total Rides', 'variable': 'User Type'},
-                 color_discrete_sequence=["#1f77b4", "#ff7f0e"])  # Warna yang lebih menarik
-    st.plotly_chart(fig, use_container_width=True)
-
-    # Penjelasan Grafik dengan Expander
-    with st.expander("📝 **Insights: What does this chart tell us?**"):
-        st.markdown("""
-            - The highest number of bike rentals occurs in **Fall**, followed by **Summer** and **Winter**, while **Spring** has the lowest number of rentals.
-            - This indicates that **Fall** and **Summer** are more conducive for biking activities, likely due to pleasant weather conditions.
-            - **Spring**, which tends to be wetter or colder, may reduce the interest in bike rentals.
-        """)
-
 with tab2:
     st.markdown("""
         ### **Trends**
@@ -184,14 +161,47 @@ with tab2:
 
     # Monthly Rentals
     st.markdown("### **Monthly Rentals**")
-    monthly_df['total_rides'] = monthly_df['casual_rides'] + monthly_df['registered_rides']
-    fig = px.bar(monthly_df,
-                 x='yearmonth',
-                 y=['casual_rides', 'registered_rides', 'total_rides'],
-                 barmode='group',
-                 title="Bike Rental Trends in Recent Years",
-                 labels={'casual_rides': 'Casual Rentals', 'registered_rides': 'Registered Rentals', 'total_rides': 'Total Rides'})
-    st.plotly_chart(fig, use_container_width=True)
+
+    # Create data for line chart
+    monthly_counts = day_df.groupby(['month', 'year'])['count'].sum().reset_index()
+
+    # Map month numbers to month names
+    month_names = [
+        'January', 'February', 'March', 'April', 'May', 'June', 
+        'July', 'August', 'September', 'October', 'November', 'December'
+    ]
+    monthly_counts['month'] = monthly_counts['month'].map(lambda x: month_names[x - 1])
+
+    # Plot line chart
+    plt.figure(figsize=(10, 5), facecolor='none')  # Transparent canvas
+    ax = sns.lineplot(
+        data=monthly_counts,
+        x="month",
+        y="count",
+        hue="year",
+        marker="o",
+        palette="Set2"
+    )
+
+    # Add title and labels
+    plt.title("Total Bike Rentals by Month and Year", fontsize=14, color='#666666')  # Grey title
+    plt.xlabel(None)
+    plt.ylabel(None)
+    plt.xticks(rotation=45, color='#666666')  # Rotate month labels and set text color
+    plt.yticks(color='#666666')  # Set y-axis text color
+
+    # Set plot background to transparent
+    ax.set_facecolor('none')  # Transparent plot background
+
+    # Set axis line colors
+    ax.spines['bottom'].set_color('#CCCCCC')  # Light grey x-axis line
+    ax.spines['left'].set_color('#CCCCCC')  # Light grey y-axis line
+
+    # Set legend
+    plt.legend(title="Year", loc="upper right", title_fontsize=12, fontsize=10, facecolor='#666666', edgecolor='none')
+
+    # Display plot in Streamlit
+    st.pyplot(plt)
 
     # Insights with Expander
     with st.expander("📝 **Insights: What does this chart tell us?**"):
@@ -201,13 +211,6 @@ with tab2:
             - **Trend Analysis**: This indicates a growing trend in bike usage year over year, likely influenced by factors such as favorable weather conditions or increased public interest in cycling.
         """)
 
-    # Scatter Plot: Season vs Temperature
-    st.markdown("### **Season vs Temperature**")
-    fig = px.scatter(day_df, x='temp', y='count', color='season',
-                     title='Bike Rental Clusters by Season and Temperature',
-                     labels={'temp': 'Temperature (°C)', 'count': 'Total Rides'})
-    st.plotly_chart(fig, use_container_width=True)
-
 with tab3:
     st.markdown("""
         ### **Analysis**
@@ -216,33 +219,85 @@ with tab3:
 
     # Weather Distribution
     st.markdown("### **Weather Distribution**")
-    fig = px.box(day_df, x='weathersit', y='count', color='weathersit',
-                 title='Bike Users Distribution Based on Weather Condition',
-                 labels={'weathersit': 'Weather Condition', 'count': 'Total Rides'})
-    st.plotly_chart(fig, use_container_width=True)
 
-    # Working Day, Holiday, and Weekday Analysis
-    st.markdown("### **Working Day, Holiday, and Weekday Analysis**")
+    # Mapping weather categories
+    weather_mapping = {
+        1: "Clear/Partly Cloudy",
+        2: "Misty/Cloudy",
+        3: "Light Snow/Rain",
+        4: "Heavy Rain/Snow"
+    }
 
-    # Working Day vs Holiday
-    st.markdown("#### **Working Day vs Holiday**")
-    workingday_usage = day_df.groupby('workingday')['count'].sum().reset_index()
-    workingday_usage['workingday'] = workingday_usage['workingday'].map({0: 'Holiday/Weekend', 1: 'Working Day'})
-    fig1 = px.bar(workingday_usage, x='workingday', y='count',
-                  title='Total Bike Rentals: Working Day vs Holiday/Weekend',
-                  labels={'workingday': 'Day Type', 'count': 'Total Rides'},
-                  color='workingday',
-                  color_discrete_sequence=px.colors.qualitative.Pastel)
-    st.plotly_chart(fig1, use_container_width=True)
+    # Set figure size and transparent canvas
+    plt.figure(figsize=(10, 6), facecolor='none')
 
-    # Weekday Analysis
-    st.markdown("#### **Weekday Analysis**")
-    weekday_usage = day_df.groupby('weekday')['count'].sum().reset_index()
-    fig2 = px.bar(weekday_usage, x='weekday', y='count',
-                  title='Total Bike Rentals by Weekday',
-                  labels={'weekday': 'Weekday', 'count': 'Total Rides'},
-                  color='weekday',
-                  color_discrete_sequence=px.colors.qualitative.Pastel)
-    st.plotly_chart(fig2, use_container_width=True)
+    # Custom color palette
+    custom_palette = ["#F37199", "#AC1754", "#F7A8C4", "#E53888"]
+
+    # Create barplot for bike rentals by weather condition
+    ax = sns.barplot(data=day_df, x='weathersit', y='count', palette=custom_palette)
+
+    # Add title and axis labels
+    plt.title('Bike Rentals Distribution by Weather Condition', fontsize=14, color='#666666')  # Grey title
+    plt.xlabel(None)
+    plt.ylabel('Total Bike Rentals', fontsize=12, color='#666666')  # Grey y-axis label
+
+    # Set axis text colors
+    plt.xticks(color='#666666')  # Grey x-axis text
+    plt.yticks(color='#666666')  # Grey y-axis text
+
+    # Set plot background to transparent
+    ax.set_facecolor('none')  # Transparent plot background
+
+    # Set axis line colors
+    ax.spines['bottom'].set_color('#CCCCCC')  # Light grey x-axis line
+    ax.spines['left'].set_color('#CCCCCC')  # Light grey y-axis line
+
+    # Display plot in Streamlit
+    st.pyplot(plt)
+
+    # Insights with Expander
+    with st.expander("📝 **Insights: What does this chart tell us?**"):
+        st.markdown("""
+            - **Clear/Partly Cloudy**: The highest number of bike rentals occurs in clear or partly cloudy weather, indicating that sunny weather is highly conducive to biking.
+            - **Misty/Cloudy**: Bike rentals decrease slightly in misty or cloudy weather, but it remains a popular choice for riders.
+            - **Light Snow/Rain**: Bike rentals drop significantly during light snow or rain, as these conditions make cycling less comfortable.
+            - **Heavy Rain/Snow**: The lowest number of bike rentals occurs during heavy rain or snow, as these conditions are least favorable for cycling.
+        """)
+
+    # Seasonal Usage
+    st.markdown("### **Seasonal Usage** 🌸☀️🍂❄️")
+    st.markdown("""
+        Explore how bike rentals vary across different seasons. The chart below shows the total number of rides for each season.
+    """)
+
+    # Create visualization for bike rentals by season
+    plt.figure(figsize=(10, 6), facecolor='none')  # Transparent canvas
+    custom_palette = ["#F37199", "#E53888", "#AC1754", "#F7A8C4"] 
+    ax = sns.barplot(data=day_df, x='season', y='count', palette=custom_palette, estimator=sum, ci=None)
+
+    # Add title and axis labels
+    plt.title('Total Bike Rentals by Season', fontsize=14, color='#E53888')  
+    plt.xlabel('Season', fontsize=12, color='#E53888')  
+    plt.ylabel('Total Bike Rentals', fontsize=12, color='#E53888') 
+
+    # Set plot background and axis line colors
+    ax.set_facecolor('none')  # Transparent plot background
+    plt.gca().spines['bottom'].set_color('#CCCCCC')  
+    plt.gca().spines['left'].set_color('#CCCCCC')  
+    plt.gca().tick_params(axis='x', colors='#666666')  # Grey x-axis text
+    plt.gca().tick_params(axis='y', colors='#666666')  # Grey y-axis text
+
+    # Display plot in Streamlit
+    st.pyplot(plt)
+
+    # Insights with Expander
+    with st.expander("📝 **Insights: What does this chart tell us?**"):
+        st.markdown("""
+            - The highest number of bike rentals occurs in **Fall**, followed by **Summer** and **Winter**, while **Spring** has the lowest number of rentals.
+            - This indicates that **Fall** and **Summer** are more conducive for biking activities, likely due to pleasant weather conditions.
+            - **Spring**, which tends to be wetter or colder, may reduce the interest in bike rentals.
+        """)
+    
 # Footer
 st.caption('Copyright (c), created by echaan')
