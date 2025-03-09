@@ -44,46 +44,6 @@ day_df['weathersit'] = day_df['weathersit'].map({
     4: 'Severe Weather'
 })
 
-# Resample data by month
-monthly_df = day_df.resample(rule='M', on='dateday').agg({
-    "casual": "sum",
-    "registered": "sum",
-    "count": "sum"
-})
-monthly_df.index = monthly_df.index.strftime('%b-%y')
-monthly_df = monthly_df.reset_index()
-monthly_df.rename(columns={
-    "dateday": "yearmonth",
-    "count": "total_rides",
-    "casual": "casual_rides",
-    "registered": "registered_rides"
-}, inplace=True)
-
-# Function to perform groupby and aggregation
-def calculate_stats(df, group_col, agg_col, agg_funcs):
-    return df.groupby(group_col)[agg_col].agg(agg_funcs)
-
-# Aggregation for various data groups
-month_stats = calculate_stats(day_df, 'month', 'count', ['max', 'min', 'mean', 'sum'])
-weather_stats = calculate_stats(day_df, 'weathersit', 'count', ['max', 'min', 'mean', 'sum'])
-holiday_stats = calculate_stats(day_df, 'holiday', 'count', ['max', 'min', 'mean', 'sum'])
-weekday_stats = calculate_stats(day_df, 'weekday', 'count', ['max', 'min', 'mean'])
-workingday_stats = calculate_stats(day_df, 'workingday', 'count', ['max', 'min', 'mean'])
-
-# Aggregation for season with different columns
-season_stats = day_df.groupby('season').agg({
-    'casual': 'mean',
-    'registered': 'mean',
-    'count': ['max', 'min', 'mean']
-})
-
-# Aggregation for weather variables by season
-season_weather_stats = day_df.groupby('season').agg({
-    'temp': ['max', 'min', 'mean'],
-    'atemp': ['max', 'min', 'mean'],
-    'hum': ['max', 'min', 'mean']
-})
-
 # ----------------------------
 # Streamlit Sidebar
 # ----------------------------
@@ -124,9 +84,49 @@ with st.sidebar:
 
 # Filter main dataframe based on selected date range
 main_df = day_df[
-    (day_df["dateday"] >= str(start_date)) &
-    (day_df["dateday"] <= str(end_date))
+    (day_df["dateday"] >= pd.to_datetime(start_date)) &
+    (day_df["dateday"] <= pd.to_datetime(end_date))
 ]
+
+# Resample data by month for the filtered data
+monthly_df = main_df.resample(rule='M', on='dateday').agg({
+    "casual": "sum",
+    "registered": "sum",
+    "count": "sum"
+})
+monthly_df.index = monthly_df.index.strftime('%b-%y')
+monthly_df = monthly_df.reset_index()
+monthly_df.rename(columns={
+    "dateday": "yearmonth",
+    "count": "total_rides",
+    "casual": "casual_rides",
+    "registered": "registered_rides"
+}, inplace=True)
+
+# Function to perform groupby and aggregation
+def calculate_stats(df, group_col, agg_col, agg_funcs):
+    return df.groupby(group_col)[agg_col].agg(agg_funcs)
+
+# Aggregation for various data groups
+month_stats = calculate_stats(main_df, 'month', 'count', ['max', 'min', 'mean', 'sum'])
+weather_stats = calculate_stats(main_df, 'weathersit', 'count', ['max', 'min', 'mean', 'sum'])
+holiday_stats = calculate_stats(main_df, 'holiday', 'count', ['max', 'min', 'mean', 'sum'])
+weekday_stats = calculate_stats(main_df, 'weekday', 'count', ['max', 'min', 'mean'])
+workingday_stats = calculate_stats(main_df, 'workingday', 'count', ['max', 'min', 'mean'])
+
+# Aggregation for season with different columns
+season_stats = main_df.groupby('season').agg({
+    'casual': 'mean',
+    'registered': 'mean',
+    'count': ['max', 'min', 'mean']
+})
+
+# Aggregation for weather variables by season
+season_weather_stats = main_df.groupby('season').agg({
+    'temp': ['max', 'min', 'mean'],
+    'atemp': ['max', 'min', 'mean'],
+    'hum': ['max', 'min', 'mean']
+})
 
 # ----------------------------
 # Streamlit Main Page
@@ -163,7 +163,7 @@ with tab2:
     st.markdown("### **Monthly Rentals**")
 
     # Create data for line chart
-    monthly_counts = day_df.groupby(['month', 'year'])['count'].sum().reset_index()
+    monthly_counts = main_df.groupby(['month', 'year'])['count'].sum().reset_index()
 
     # Map month numbers to month names
     month_names = [
@@ -203,14 +203,6 @@ with tab2:
     # Display plot in Streamlit
     st.pyplot(plt)
 
-    # Insights with Expander
-    with st.expander("📝 **Insights: What does this chart tell us?**"):
-        st.markdown("""
-            - **Consistent Growth**: Bike rentals in 2012 are consistently higher than in 2011 across all months.
-            - **Significant Increase**: A notable increase is observed from March to September, with the peak occurring in September.
-            - **Trend Analysis**: This indicates a growing trend in bike usage year over year, likely influenced by factors such as favorable weather conditions or increased public interest in cycling.
-        """)
-
 with tab3:
     st.markdown("""
         ### **Analysis**
@@ -220,14 +212,6 @@ with tab3:
     # Weather Distribution
     st.markdown("### **Weather Distribution**")
 
-    # Mapping weather categories
-    weather_mapping = {
-        1: "Clear/Partly Cloudy",
-        2: "Misty/Cloudy",
-        3: "Light Snow/Rain",
-        4: "Heavy Rain/Snow"
-    }
-
     # Set figure size and transparent canvas
     plt.figure(figsize=(10, 6), facecolor='none')
 
@@ -235,7 +219,7 @@ with tab3:
     custom_palette = ["#F37199", "#AC1754", "#F7A8C4", "#E53888"]
 
     # Create barplot for bike rentals by weather condition
-    ax = sns.barplot(data=day_df, x='weathersit', y='count', palette=custom_palette)
+    ax = sns.barplot(data=main_df, x='weathersit', y='count', palette=custom_palette)
 
     # Add title and axis labels
     plt.title('Bike Rentals Distribution by Weather Condition', fontsize=14, color='#666666')  # Grey title
@@ -256,30 +240,38 @@ with tab3:
     # Display plot in Streamlit
     st.pyplot(plt)
 
-    # Insights with Expander
-    with st.expander("📝 **Insights: What does this chart tell us?**"):
-        st.markdown("""
-            - **Clear/Partly Cloudy**: The highest number of bike rentals occurs in clear or partly cloudy weather, indicating that sunny weather is highly conducive to biking.
-            - **Misty/Cloudy**: Bike rentals decrease slightly in misty or cloudy weather, but it remains a popular choice for riders.
-            - **Light Snow/Rain**: Bike rentals drop significantly during light snow or rain, as these conditions make cycling less comfortable.
-            - **Heavy Rain/Snow**: The lowest number of bike rentals occurs during heavy rain or snow, as these conditions are least favorable for cycling.
-        """)
-
     # Seasonal Usage
-    st.markdown("### **Seasonal Usage** 🌸☀️🍂❄️")
+    st.markdown("### **Seasonal Usage** ")
     st.markdown("""
         Explore how bike rentals vary across different seasons. The chart below shows the total number of rides for each season.
     """)
 
     # Create visualization for bike rentals by season
+    seasonal_usage = main_df.groupby('season')[['registered', 'casual']].sum().reset_index()
     plt.figure(figsize=(10, 6), facecolor='none')  # Transparent canvas
     custom_palette = ["#F37199", "#E53888", "#AC1754", "#F7A8C4"] 
-    ax = sns.barplot(data=day_df, x='season', y='count', palette=custom_palette, estimator=sum, ci=None)
+
+    # Membuat
+    plt.bar(
+        seasonal_usage['season'],
+        seasonal_usage['registered'],
+        label='Registered',
+        color=custom_palette[0]
+    )
+
+    plt.bar(
+        seasonal_usage['season'],
+        seasonal_usage['casual'],
+        label='Casual',
+        color=custom_palette[1],
+    )
 
     # Add title and axis labels
-    plt.title('Total Bike Rentals by Season', fontsize=14, color='#E53888')  
+    plt.title('Bike Rental Distributions Rentals by Season', fontsize=14, color='#E53888')  
     plt.xlabel('Season', fontsize=12, color='#E53888')  
     plt.ylabel('Total Bike Rentals', fontsize=12, color='#E53888') 
+    plt.legend()
+    
 
     # Set plot background and axis line colors
     ax.set_facecolor('none')  # Transparent plot background
@@ -290,14 +282,6 @@ with tab3:
 
     # Display plot in Streamlit
     st.pyplot(plt)
-
-    # Insights with Expander
-    with st.expander("📝 **Insights: What does this chart tell us?**"):
-        st.markdown("""
-            - The highest number of bike rentals occurs in **Fall**, followed by **Summer** and **Winter**, while **Spring** has the lowest number of rentals.
-            - This indicates that **Fall** and **Summer** are more conducive for biking activities, likely due to pleasant weather conditions.
-            - **Spring**, which tends to be wetter or colder, may reduce the interest in bike rentals.
-        """)
     
 # Footer
 st.caption('Copyright (c), created by echaan')
